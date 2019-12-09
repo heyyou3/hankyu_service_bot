@@ -102,7 +102,6 @@ func writeJSON(msgs PostMessages, msg Message) {
 func main() {
 	msgs := makeMessages()
 	for _, msg := range msgs.Messages {
-		// if strings.Index(msg.Text, "発生しています") > -1 {
 		if strings.Index(msg.Text, "発生しています") != -1 {
 			if isJSON() {
 				messages := readJSON()
