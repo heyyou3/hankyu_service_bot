@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -10,13 +11,6 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-)
-
-var (
-	// SlackURL は Slack チャンネルの URL
-	SlackURL = os.Getenv("SLACK_URL")
-	// ServiceJSONPath は同じ内容の遅延情報を送信しないために使用する json ファイルのパス
-	ServiceJSONPath = "./json/service.json"
 )
 
 // Message は送信するメッセージを保持する構造体
@@ -28,6 +22,11 @@ type Message struct {
 type PostMessages struct {
 	Messages []Message `json:"messages"`
 }
+
+var (
+	// SlackURL は Slack チャンネルの URL
+	SlackURL = os.Getenv("SLACK_URL")
+)
 
 func postMessage(msg Message) {
 	jsonByte, err := json.Marshal(msg)
@@ -67,16 +66,16 @@ func makeMessages() PostMessages {
 	return messages
 }
 
-func isJSON() bool {
-	if _, err := os.Stat(ServiceJSONPath); os.IsNotExist(err) {
+func isJSON(fileName string) bool {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
 		return false
 	}
 	return true
 }
 
-func readJSON() PostMessages {
+func readJSON(fileName string) PostMessages {
 	var messages PostMessages
-	raw, _ := ioutil.ReadFile(ServiceJSONPath)
+	raw, _ := ioutil.ReadFile(fileName)
 	json.Unmarshal(raw, &messages)
 	return messages
 }
@@ -90,33 +89,38 @@ func isExistMsg(inspectMsg Message, msgs PostMessages) bool {
 	return false
 }
 
-func writeJSON(msgs PostMessages, msg Message) {
+func writeJSON(fileName string, msgs PostMessages, msg Message) {
 	msgs.Messages = append(msgs.Messages, msg)
 	jsonByte, err := json.Marshal(msgs)
 	if err != nil {
 		fmt.Printf("%s\n", err)
 	}
-	ioutil.WriteFile(ServiceJSONPath, jsonByte, os.ModePerm)
+	ioutil.WriteFile(fileName, jsonByte, os.ModePerm)
 }
 
 func main() {
+	// ServiceJSONPath は同じ内容の遅延情報を送信しないために使用する json ファイルのパス
+	var ServiceJSONPath = flag.String("json-path", "./json/service.json", "遅延情報が記載された json を保存するファイルパス")
+
+	flag.Parse()
+
 	msgs := makeMessages()
 	for _, msg := range msgs.Messages {
 		if strings.Index(msg.Text, "発生しています") != -1 {
-			if isJSON() {
-				messages := readJSON()
+			if isJSON(*ServiceJSONPath) {
+				messages := readJSON(*ServiceJSONPath)
 				if !isExistMsg(msg, messages) {
 					postMessage(msg)
-					writeJSON(messages, msg)
+					writeJSON(*ServiceJSONPath, messages, msg)
 				}
 			} else {
 				postMessage(msg)
 				messages := PostMessages{}
-				writeJSON(messages, msg)
+				writeJSON(*ServiceJSONPath, messages, msg)
 			}
 		} else {
-			if isJSON() {
-				os.Remove(ServiceJSONPath)
+			if isJSON(*ServiceJSONPath) {
+				os.Remove(*ServiceJSONPath)
 				postMessage(Message{Text: "遅延が解消されました。"})
 			}
 		}
