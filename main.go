@@ -106,7 +106,7 @@ func main() {
 
 	msgs := makeMessages()
 	for _, msg := range msgs.Messages {
-		if strings.Index(msg.Text, "発生しています") != -1 {
+		if len(msgs.Messages) > 1 || strings.Index(msg.Text, "発生しています") != -1 {
 			if isJSON(*ServiceJSONPath) {
 				messages := readJSON(*ServiceJSONPath)
 				if !isExistMsg(msg, messages) {
